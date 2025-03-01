@@ -2,7 +2,7 @@
 
 A simple pdf annotator that stores annotation in a separate file.
 
-## Dependenciew
+## Dependencies
 
 See https://v2.tauri.app/start/prerequisites/#system-dependencies.
 
