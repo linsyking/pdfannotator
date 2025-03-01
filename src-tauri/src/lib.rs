@@ -5,6 +5,16 @@ use tauri::Manager;
 use tauri::State;
 use tauri_plugin_cli::CliExt;
 
+use serde_json::{Value, to_string_pretty};
+
+fn prettify_json(json_str: String) -> String {
+    match serde_json::from_str::<Value>(&json_str) {
+        Ok(parsed) => to_string_pretty(&parsed).unwrap_or_else(|_| "[]".to_string()),
+        Err(_) => "[]".to_string(),
+    }
+}
+
+
 #[derive(Default)]
 struct AppState {
     filepath: String,
@@ -22,8 +32,10 @@ fn getconfig(state: State<AppState>) -> Result<String, ()> {
 #[tauri::command]
 fn save(state: State<AppState>, data: String) -> String {
     let fp = state.filepath.clone();
+    // Format data (JSON) to pretty string
+    let pretty_data = prettify_json(data);
     // Write to file
-    let res = std::fs::write(fp + ".json", data);
+    let res = std::fs::write(fp + ".json", pretty_data);
     if let Err(e) = res {
         println!("Error: {}", e);
     }
@@ -48,7 +60,7 @@ pub fn run() {
                     // println!("{:?}", matches.args);
                     let arg = matches.args.get("source").unwrap();
                     match &arg.value {
-                        serde_json::Value::String(value) => {
+                        Value::String(value) => {
                             // Check if file exists
                             if !std::path::Path::new(value).exists() {
                                 return Err("File does not exist".into());

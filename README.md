@@ -13,12 +13,7 @@ pnpm i
 pnpm tauri build
 ```
 
-## Known issues
+## TODO
 
-On Linux WebKit might not work properly, you need to set some environment variable:
-
-```bash
-WEBKIT_DISABLE_DMABUF_RENDERER=1 pdfannotator xxx.pdf
-# OR
-WEBKIT_DISABLE_COMPOSITING_MODE=1 pdfannotator xxx.pdf
-```
+- Shortcut
+- JSON format version
