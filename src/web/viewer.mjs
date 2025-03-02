@@ -11659,7 +11659,7 @@ class PDFViewer {
   #supportsPinchToZoom = true;
   #textLayerMode = TextLayerMode.ENABLE;
   constructor(options) {
-    const viewerVersion = "5.0.273";
+    const viewerVersion = "5.0.274";
     if (version !== viewerVersion) {
       throw new Error(`The API version "${version}" does not match the Viewer version "${viewerVersion}".`);
     }
@@ -14779,7 +14779,6 @@ var web_pdfAnnotate = __webpack_require__(83);
 
 
 const FORCE_PAGES_LOADED_TIMEOUT = 10000;
-const invoke = window.__TAURI__.core.invoke;
 const ViewOnLoad = {
   UNKNOWN: -1,
   PREVIOUS: 0,
@@ -14846,6 +14845,9 @@ const PDFViewerApplication = {
   _isScrolling: false,
   editorUndoBar: null,
   async initialize(appConfig) {
+    if (window.__TAURI__) {
+      this.invoke = window.__TAURI__.core.invoke;
+    }
     this.appConfig = appConfig;
     try {
       await this.preferences.initializedPromise;
@@ -15157,7 +15159,7 @@ const PDFViewerApplication = {
     }
   },
   async annotateFile(annotations) {
-    const data = await invoke("file");
+    const data = await this.invoke("file");
     const factory = new pdfAnnotate.AnnotationFactory(data);
     for (const annotation of annotations) {
       if (annotation.annotationType == AnnotationType.HIGHLIGHT) {
@@ -15240,15 +15242,20 @@ const PDFViewerApplication = {
     if (file) {
       this.setTitleUsingUrl(file, file);
       try {
-        const config_json = await invoke("getconfig");
+        const config_json = await this.invoke("getconfig");
         const annotations = JSON.parse(config_json);
         await this.annotateFile(annotations);
       } catch (e) {
-        console.log(e);
-        const data = await invoke("file");
-        this.open({
-          data
-        });
+        if (this.invoke) {
+          const data = await this.invoke("file");
+          this.open({
+            data
+          });
+        } else {
+          this.open({
+            url: file
+          });
+        }
       }
     } else {
       this._hideViewBookmark();
@@ -15523,9 +15530,13 @@ const PDFViewerApplication = {
           totanns.push(pann);
         }
       }
-      invoke("save", {
-        data: JSON.stringify(totanns)
-      });
+      if (this.invoke) {
+        this.invoke("save", {
+          data: JSON.stringify(totanns)
+        });
+      } else {
+        console.log(totanns);
+      }
     } catch (reason) {
       console.error(`Error when saving the document:`, reason);
     } finally {
@@ -16852,8 +16863,8 @@ function beforeUnload(evt) {
 
 
 
-const pdfjsVersion = "5.0.273";
-const pdfjsBuild = "997dbcf83";
+const pdfjsVersion = "5.0.274";
+const pdfjsBuild = "a3b423871";
 const AppConstants = {
   LinkTarget: LinkTarget,
   RenderingStates: RenderingStates,
