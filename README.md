@@ -10,7 +10,7 @@ See https://v2.tauri.app/start/prerequisites/#system-dependencies.
 
 ```
 pnpm i
-pnpm tauri build
+pnpm tauri build --no-bundle
 ```
 
 ## TODO
