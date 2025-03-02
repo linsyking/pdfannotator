@@ -11344,6 +11344,9 @@ class TextLayer {
     div.textContent = "X";
     document.body.append(div);
     this.#minFontSize = div.getBoundingClientRect().height;
+    if (this.#minFontSize < 1) {
+      this.#minFontSize = 1;
+    }
     div.remove();
   }
   static #getAscent(fontFamily, style, lang) {
@@ -11527,7 +11530,7 @@ function getDocument(src = {}) {
   }
   const docParams = {
     docId,
-    apiVersion: "5.0.269",
+    apiVersion: "5.0.273",
     data,
     password,
     disableAutoFetch,
@@ -13284,8 +13287,8 @@ class InternalRenderTask {
     }
   }
 }
-const version = "5.0.269";
-const build = "7651d863d";
+const version = "5.0.273";
+const build = "997dbcf83";
 
 ;// ./src/shared/scripting_utils.js
 function makeColorComp(n) {
@@ -22674,8 +22677,8 @@ class DrawLayer {
 
 
 
-const pdfjsVersion = "5.0.269";
-const pdfjsBuild = "7651d863d";
+const pdfjsVersion = "5.0.273";
+const pdfjsBuild = "997dbcf83";
 {
   globalThis.pdfjsTestingUtils = {
     HighlightOutliner: HighlightOutliner

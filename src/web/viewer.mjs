@@ -710,7 +710,7 @@ const defaultOptions = {
     kind: OptionKind.VIEWER + OptionKind.PREFERENCE + OptionKind.EVENT_DISPATCH
   },
   enableHighlightFloatingButton: {
-    value: false,
+    value: true,
     kind: OptionKind.VIEWER + OptionKind.PREFERENCE
   },
   enableNewAltTextWhenAddingImage: {
@@ -1537,7 +1537,7 @@ class BasePreferences {
     enableAltTextModelDownload: true,
     enableAutoLinking: false,
     enableGuessAltText: true,
-    enableHighlightFloatingButton: false,
+    enableHighlightFloatingButton: true,
     enableNewAltTextWhenAddingImage: true,
     enablePermissions: false,
     enablePrintAutoRotate: true,
@@ -4540,13 +4540,6 @@ class DownloadManager {
       }
       blobUrl = url + "#pdfjs.action=download";
     }
-    download(blobUrl, filename);
-  }
-  downloadjson(data, filename) {
-    let blobUrl;
-    blobUrl = URL.createObjectURL(new Blob([JSON.stringify(data)], {
-      type: "application/json"
-    }));
     download(blobUrl, filename);
   }
 }
@@ -11666,7 +11659,7 @@ class PDFViewer {
   #supportsPinchToZoom = true;
   #textLayerMode = TextLayerMode.ENABLE;
   constructor(options) {
-    const viewerVersion = "5.0.269";
+    const viewerVersion = "5.0.273";
     if (version !== viewerVersion) {
       throw new Error(`The API version "${version}" does not match the Viewer version "${viewerVersion}".`);
     }
@@ -13337,11 +13330,6 @@ class SecondaryToolbar {
       eventName: "documentproperties",
       close: true
     }];
-    buttons.push({
-      element: options.openFileButton,
-      eventName: "openfile",
-      close: true
-    });
     this.eventBus = eventBus;
     this.opened = false;
     this.#bindListeners(buttons);
@@ -15168,40 +15156,14 @@ const PDFViewerApplication = {
       };
     }
   },
-  async annotateFile(file, annotations) {
+  async annotateFile(annotations) {
     const data = await invoke("file");
     const factory = new pdfAnnotate.AnnotationFactory(data);
     for (const annotation of annotations) {
       if (annotation.annotationType == AnnotationType.HIGHLIGHT) {
-        const color = annotation.color;
-        let quadPoints = [];
-        for (const key in annotation.quadPoints) {
-          quadPoints.push(annotation.quadPoints[key]);
-        }
-        factory.createHighlightAnnotation({
-          page: annotation.pageIndex,
-          rect: annotation.rect,
-          color: {
-            r: color["0"] / 255.0,
-            g: color["1"] / 255.0,
-            b: color["2"] / 255.0
-          },
-          opacity: annotation.opacity,
-          quadPoints: quadPoints
-        });
+        factory.createHighlightAnnotation(annotation);
       } else if (annotation.annotationType == AnnotationType.FREETEXT) {
-        const fontColor = annotation.defaultAppearanceData.fontColor;
-        factory.createFreeTextAnnotation({
-          page: annotation.pageIndex,
-          rect: annotation.rect,
-          fontSize: annotation.defaultAppearanceData.fontSize,
-          contents: annotation.contentsObj.str,
-          textColor: {
-            r: fontColor["0"] / 255.0,
-            g: fontColor["1"] / 255.0,
-            b: fontColor["2"] / 255.0
-          }
-        });
+        factory.createFreeTextAnnotation(annotation);
       } else {
         console.error("Annotation type not supported");
       }
@@ -15280,7 +15242,7 @@ const PDFViewerApplication = {
       try {
         const config_json = await invoke("getconfig");
         const annotations = JSON.parse(config_json);
-        await this.annotateFile(file, annotations);
+        await this.annotateFile(annotations);
       } catch (e) {
         console.log(e);
         const data = await invoke("file");
@@ -15533,12 +15495,32 @@ const PDFViewerApplication = {
         const page = await this.pdfDocument.getPage(i);
         const anns = await page.getAnnotations();
         for (const ann of anns) {
-          ann.pageIndex = i - 1;
-          if (ann.annotationType == AnnotationType.HIGHLIGHT || ann.annotationType == AnnotationType.FREETEXT) {
-            totanns.push(ann);
+          let pann = {
+            page: i - 1,
+            annotationType: ann.annotationType,
+            rect: ann.rect ?? [],
+            opacity: ann.opacity ?? 1
+          };
+          if (ann.annotationType == AnnotationType.HIGHLIGHT) {
+            pann.quadPoints = Array.from(ann.quadPoints);
+            pann.color = {
+              r: ann.color[0] / 255.0,
+              g: ann.color[1] / 255.0,
+              b: ann.color[2] / 255.0
+            };
+          } else if (ann.annotationType == AnnotationType.FREETEXT) {
+            pann.contents = ann.contentsObj.str;
+            pann.fontSize = ann.defaultAppearanceData.fontSize;
+            pann.textColor = {
+              r: ann.defaultAppearanceData.fontColor[0] / 255.0,
+              g: ann.defaultAppearanceData.fontColor[1] / 255.0,
+              b: ann.defaultAppearanceData.fontColor[2] / 255.0
+            };
           } else {
             console.log("not supported yet");
+            continue;
           }
+          totanns.push(pann);
         }
       }
       invoke("save", {
@@ -16675,13 +16657,9 @@ function onKeyDown(evt) {
         });
         handled = true;
         break;
-      case 79:
-        {
-          eventBus.dispatch("openfile", {
-            source: window
-          });
-          handled = true;
-        }
+      case 27:
+        document.getElementById("editorHighlightButton").click();
+        handled = true;
         break;
     }
   }
@@ -16874,8 +16852,8 @@ function beforeUnload(evt) {
 
 
 
-const pdfjsVersion = "5.0.269";
-const pdfjsBuild = "7651d863d";
+const pdfjsVersion = "5.0.273";
+const pdfjsBuild = "997dbcf83";
 const AppConstants = {
   LinkTarget: LinkTarget,
   RenderingStates: RenderingStates,
@@ -16919,7 +16897,7 @@ function getViewerConfiguration() {
       toolbar: document.getElementById("secondaryToolbar"),
       toggleButton: document.getElementById("secondaryToolbarToggleButton"),
       presentationModeButton: document.getElementById("presentationMode"),
-      openFileButton: document.getElementById("secondaryOpenFile"),
+      openFileButton: null,
       printButton: document.getElementById("secondaryPrint"),
       downloadButton: document.getElementById("secondaryDownload"),
       viewBookmarkButton: document.getElementById("viewBookmark"),
