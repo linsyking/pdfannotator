@@ -1,0 +1,3 @@
+[submodule "pdf.js"]
+	path = pdf.js
+	url = git@github.com:linsyking/pdf.js.git
