@@ -10,7 +10,7 @@ jsbuild:
 	rm -rf src/web/*.pdf
 	rm -rf src/web/*.map
 
-dev: jsbuild
+dev:
 	pnpm tauri dev
 
 build:
