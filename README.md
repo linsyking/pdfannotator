@@ -9,11 +9,10 @@ See https://v2.tauri.app/start/prerequisites/#system-dependencies.
 ## Build
 
 ```
-pnpm i
-pnpm tauri build --no-bundle
+make dist
 ```
 
-## TODO
+## Keyboard shortcut
 
-- Shortcut
-- JSON format version
+- `Ctrl + S`: save annotation
+- `Ctrl + O`: open new file

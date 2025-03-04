@@ -18,4 +18,4 @@ build:
 
 dist: jsbuild build
 
-.PHONY: dev build
+.PHONY: dev build dist jsbuild

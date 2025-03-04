@@ -32,7 +32,6 @@ fn getconfig(state: State<Mutex<AppState>>) -> Result<String, ()> {
 
 #[tauri::command]
 fn changefile(state: State<Mutex<AppState>>, file: String) -> Result<(), ()> {
-    println!("Changing file to: {}", file);
     let mut state = state.lock().unwrap();
     if !std::path::Path::new(&file).exists() {
         Err(())
