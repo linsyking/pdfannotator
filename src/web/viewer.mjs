@@ -11659,7 +11659,7 @@ class PDFViewer {
   #supportsPinchToZoom = true;
   #textLayerMode = TextLayerMode.ENABLE;
   constructor(options) {
-    const viewerVersion = "5.0.274";
+    const viewerVersion = "5.0.278";
     if (version !== viewerVersion) {
       throw new Error(`The API version "${version}" does not match the Viewer version "${viewerVersion}".`);
     }
@@ -13330,6 +13330,11 @@ class SecondaryToolbar {
       eventName: "documentproperties",
       close: true
     }];
+    buttons.push({
+      element: options.openFileButton,
+      eventName: "openfile",
+      close: true
+    });
     this.eventBus = eventBus;
     this.opened = false;
     this.#bindListeners(buttons);
@@ -14501,6 +14506,30 @@ class Toolbar {
       mode: AnnotationEditorType.DISABLE
     });
   }
+  closeAll() {
+    const {
+      editorFreeTextButton,
+      editorHighlightButton,
+      editorInkButton,
+      editorStampButton,
+      editorSignatureButton
+    } = this.#opts;
+    if (editorHighlightButton.classList.contains("toggled")) {
+      editorHighlightButton.click();
+    }
+    if (editorInkButton.classList.contains("toggled")) {
+      editorInkButton.click();
+    }
+    if (editorStampButton.classList.contains("toggled")) {
+      editorStampButton.click();
+    }
+    if (editorSignatureButton.classList.contains("toggled")) {
+      editorSignatureButton.click();
+    }
+    if (editorFreeTextButton.classList.contains("toggled")) {
+      editorFreeTextButton.click();
+    }
+  }
   #bindListeners(buttons) {
     const {
       eventBus
@@ -14846,7 +14875,7 @@ const PDFViewerApplication = {
   editorUndoBar: null,
   async initialize(appConfig) {
     if (window.__TAURI__) {
-      this.invoke = window.__TAURI__.core.invoke;
+      this.tauri = window.__TAURI__;
     }
     this.appConfig = appConfig;
     try {
@@ -15159,21 +15188,26 @@ const PDFViewerApplication = {
     }
   },
   async annotateFile(annotations) {
-    const data = await this.invoke("file");
-    const factory = new pdfAnnotate.AnnotationFactory(data);
-    for (const annotation of annotations) {
-      if (annotation.annotationType == AnnotationType.HIGHLIGHT) {
-        factory.createHighlightAnnotation(annotation);
-      } else if (annotation.annotationType == AnnotationType.FREETEXT) {
-        factory.createFreeTextAnnotation(annotation);
-      } else {
-        console.error("Annotation type not supported");
+    try {
+      const data = await this.tauri.core.invoke("file");
+      const factory = new pdfAnnotate.AnnotationFactory(data);
+      for (const annotation of annotations) {
+        if (annotation.annotationType == AnnotationType.HIGHLIGHT) {
+          factory.createHighlightAnnotation(annotation);
+        } else if (annotation.annotationType == AnnotationType.FREETEXT) {
+          factory.createFreeTextAnnotation(annotation);
+        } else {
+          console.error("Annotation type not supported");
+        }
       }
+      const new_data = factory.write();
+      this.open({
+        data: new_data
+      });
+    } catch (_) {
+      console.error("No file to annotate");
+      return;
     }
-    const new_data = factory.write();
-    this.open({
-      data: new_data
-    });
   },
   async run(config) {
     await this.initialize(config);
@@ -15242,15 +15276,19 @@ const PDFViewerApplication = {
     if (file) {
       this.setTitleUsingUrl(file, file);
       try {
-        const config_json = await this.invoke("getconfig");
+        const config_json = await this.tauri.core.invoke("getconfig");
         const annotations = JSON.parse(config_json);
         await this.annotateFile(annotations);
       } catch (e) {
-        if (this.invoke) {
-          const data = await this.invoke("file");
-          this.open({
-            data
-          });
+        if (this.tauri) {
+          try {
+            const data = await this.tauri.core.invoke("file");
+            this.open({
+              data
+            });
+          } catch (_) {
+            console.error("No file to open");
+          }
         } else {
           this.open({
             url: file
@@ -15530,8 +15568,8 @@ const PDFViewerApplication = {
           totanns.push(pann);
         }
       }
-      if (this.invoke) {
-        this.invoke("save", {
+      if (this.tauri) {
+        this.tauri.core.invoke("save", {
           data: JSON.stringify(totanns)
         });
       } else {
@@ -16304,8 +16342,47 @@ initCom(PDFViewerApplication);
       originalUrl: file.name
     });
   };
-  var onOpenFile = function (evt) {
-    this._openFileInput?.click();
+  var onOpenFile = async function (evt) {
+    if (this.tauri) {
+      const {
+        open,
+        message
+      } = this.tauri.dialog;
+      const file = await open({
+        multiple: false,
+        directory: false,
+        filters: [{
+          name: 'PDF file',
+          extensions: ['pdf']
+        }]
+      });
+      try {
+        await this.tauri.core.invoke('changefile', {
+          file
+        });
+        try {
+          const config_json = await this.tauri.core.invoke("getconfig");
+          const annotations = JSON.parse(config_json);
+          await this.annotateFile(annotations);
+        } catch (e) {
+          try {
+            const data = await this.tauri.core.invoke("file");
+            this.open({
+              data
+            });
+          } catch (_) {
+            console.error("No file to open");
+          }
+        }
+      } catch (_) {
+        message('File not found', {
+          title: 'Error',
+          type: 'error'
+        });
+      }
+    } else {
+      this._openFileInput?.click();
+    }
   };
 }
 function onPageRender({
@@ -16668,9 +16745,13 @@ function onKeyDown(evt) {
         });
         handled = true;
         break;
-      case 27:
-        document.getElementById("editorHighlightButton").click();
-        handled = true;
+      case 79:
+        {
+          eventBus.dispatch("openfile", {
+            source: window
+          });
+          handled = true;
+        }
         break;
     }
   }
@@ -16746,6 +16827,7 @@ function onKeyDown(evt) {
           this.secondaryToolbar.close();
           handled = true;
         }
+        this.toolbar.closeAll();
         if (!this.supportsIntegratedFind && this.findBar?.opened) {
           this.findBar.close();
           handled = true;
@@ -16863,8 +16945,8 @@ function beforeUnload(evt) {
 
 
 
-const pdfjsVersion = "5.0.274";
-const pdfjsBuild = "a3b423871";
+const pdfjsVersion = "5.0.278";
+const pdfjsBuild = "6da816abf";
 const AppConstants = {
   LinkTarget: LinkTarget,
   RenderingStates: RenderingStates,
@@ -16908,7 +16990,7 @@ function getViewerConfiguration() {
       toolbar: document.getElementById("secondaryToolbar"),
       toggleButton: document.getElementById("secondaryToolbarToggleButton"),
       presentationModeButton: document.getElementById("presentationMode"),
-      openFileButton: null,
+      openFileButton: document.getElementById("secondaryOpenFile"),
       printButton: document.getElementById("secondaryPrint"),
       downloadButton: document.getElementById("secondaryDownload"),
       viewBookmarkButton: document.getElementById("viewBookmark"),
